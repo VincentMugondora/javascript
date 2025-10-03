@@ -511,7 +511,7 @@
   }
 
   // Quiz system
-  let quiz = { list:[], idx:0, correct:0, hintUsed:false };
+  let quiz = { list:[], idx:0, correct:0, wrong:0, hintUsed:false };
 
   // Redeem quiz (3-question sequence with early pass/fail)
   let redeem = { list:[], idx:0, correct:0, wrong:0, timerId:null, lastS:null };
@@ -539,7 +539,7 @@
       for(const q of any){ if(!list.find(x=>qid(x)===qid(q))) list.push(q); if(list.length>=3) break; }
     }
     quiz.list = list.slice(0,3);
-    quiz.idx = 0; quiz.correct = 0; quiz.hintUsed = false;
+    quiz.idx = 0; quiz.correct = 0; quiz.wrong = 0; quiz.hintUsed = false;
     show(quizModal); renderQuiz();
   }
 
@@ -691,16 +691,22 @@
 
   function onAnswer(index){
     const q = quiz.list[quiz.idx];
+    // prevent double submissions
+    quizChoices.querySelectorAll('button').forEach(b=> b.disabled = true);
     if(index === q.answerIndex){
       clearQuizTimer();
       // correct
       state.score += quiz.hintUsed ? 35 : 50;
       quiz.correct += 1;
       audio.sfx('correct');
+      if(quiz.correct >= 2){ finishQuiz(); return; }
       nextQuizStep();
     }else{
-      // try again
+      // wrong: count and move on
       flashElement(quizQuestion, '#ef4444'); audio.sfx('wrong');
+      quiz.wrong += 1;
+      if(quiz.wrong >= 2){ finishQuiz(); return; }
+      nextQuizStep();
     }
   }
 
@@ -842,9 +848,11 @@
   }
   function clearQuizTimer(){ if(quizCountdown.timerId){ clearInterval(quizCountdown.timerId); quizCountdown.timerId = null; } }
   function onQuizTimeExpired(){
-    // Count as incorrect and move to next question
+    // Count as incorrect and move to next question (early fail at 2 wrong)
     flashElement(quizQuestion, '#ef4444');
     audio.sfx('wrong');
+    quiz.wrong += 1;
+    if(quiz.wrong >= 2){ finishQuiz(); return; }
     nextQuizStep();
   }
 
