@@ -502,8 +502,23 @@
       const prev = scores[w] || 0;
       scores[w] = Math.max(prev, state.score);
       save(KEYS.scores, scores);
+      // Auto-advance: if next level exists, start it shortly; else go to World Select
+      resultsContinueBtn.classList.add('hidden');
+      show(resultsModal);
+      setTimeout(()=>{
+        hide(resultsModal);
+        state.inQuiz = false; state.paused = false;
+        if(state.level < 3){
+          startGame(state.world, state.level + 1);
+        }else{
+          // World complete
+          gotoWorldSelect();
+        }
+      }, 1200);
+      return; // prevent showing modal twice
     }else{
       resultsText.textContent = `You got ${quiz.correct}/3. Try again to pass the gate!`;
+      resultsContinueBtn.classList.remove('hidden');
     }
     show(resultsModal);
   }
