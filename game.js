@@ -513,8 +513,8 @@
   // Quiz system
   let quiz = { list:[], idx:0, correct:0, hintUsed:false };
 
-  // Redeem quiz (single timed question)
-  let redeem = { q:null, deadline:0, timerId:null };
+  // Redeem quiz (3-question sequence with early pass/fail)
+  let redeem = { list:[], idx:0, correct:0, wrong:0, timerId:null, lastS:null };
 
   // Quiz per-question countdown
   let quizCountdown = { timerId:null, end:0 };
@@ -550,14 +550,29 @@
 
   function triggerRedeem(){
     state.inRedeem = true; state.paused = true;
-    // pick a single question from current world
+    // build 3-question list for current world (prefer unseen)
     const pool = QUESTION_BANK.filter(q => q.world === state.world);
-    const unseen = pool.filter(q=>!hasSeen(qid(q)));
-    const from = unseen.length ? unseen : pool;
-    const q = from[Math.floor(Math.random()*from.length)] || (DEFAULT_QUESTIONS.find(q=>q.world===state.world) || DEFAULT_QUESTIONS[0]);
+    const unseen = shuffleInPlace(pool.filter(q=>!hasSeen(qid(q))));
+    const list = unseen.slice(0,3);
+    if(list.length < 3){
+      const rest = shuffleInPlace(pool.filter(q=>!list.find(x=>qid(x)===qid(q))));
+      for(const q of rest){ if(!list.find(x=>qid(x)===qid(q))) list.push(q); if(list.length>=3) break; }
+    }
+    if(list.length < 3){
+      const fallbacks = shuffleInPlace(DEFAULT_QUESTIONS.filter(q=>q.world===state.world && !list.find(x=>qid(x)===qid(q))));
+      for(const q of fallbacks){ if(!list.find(x=>qid(x)===qid(q))) list.push(q); if(list.length>=3) break; }
+    }
+    redeem.list = list.slice(0,3);
+    redeem.idx = 0; redeem.correct = 0; redeem.wrong = 0;
+    show(redeemModal);
+    renderRedeemQuestion();
+  }
+
+  function renderRedeemQuestion(){
+    const q = redeem.list[redeem.idx];
+    if(!q){ finishRedeemQuiz(); return; }
     markSeen(qid(q));
-    redeem.q = q;
-    redeemWorld.textContent = prettyWorld(state.world);
+    redeemWorld.textContent = `${prettyWorld(state.world)}  Q${redeem.idx+1}/3`;
     redeemQuestion.textContent = q.question;
     redeemChoices.innerHTML = '';
     q.choices.forEach((choice, i)=>{
@@ -566,10 +581,9 @@
       b.addEventListener('click', ()=> onRedeemAnswer(i));
       redeemChoices.appendChild(b);
     });
-    // timer: harder at higher levels
+    // per-question timer (shorter at higher levels)
     const seconds = state.level === 1 ? 10 : state.level === 2 ? 8 : 6;
     startRedeemTimer(seconds);
-    show(redeemModal);
   }
 
   function startRedeemTimer(seconds){
@@ -583,7 +597,7 @@
       if(s !== redeem.lastS && s <= 3){ audio.sfx('tick'); redeem.lastS = s; }
       if(remaining <= 0){
         clearRedeemTimer();
-        redeemFail();
+        onRedeemTimeExpired();
       }
     }, 100);
   }
@@ -591,23 +605,53 @@
   function clearRedeemTimer(){ if(redeem.timerId){ clearInterval(redeem.timerId); redeem.timerId = null; } }
 
   function onRedeemAnswer(index){
-    const q = redeem.q;
+    const q = redeem.list[redeem.idx];
     if(!q) return;
+    // disable inputs to avoid double answers
+    redeemChoices.querySelectorAll('button').forEach(b=> b.disabled = true);
     if(index === q.answerIndex){
-      // success: continue without penalty
       clearRedeemTimer();
-      hide(redeemModal);
-      state.inRedeem = false; state.paused = false;
+      redeem.correct += 1;
+      audio.sfx('correct');
+      // Early pass if 2 correct
+      if(redeem.correct >= 2){ finishRedeemQuiz(true); return; }
     }else{
-      // wrong: allow retry until timer ends
-      flashElement(redeemQuestion, '#ef4444'); audio.sfx('wrong');
+      audio.sfx('wrong');
+      redeem.wrong += 1;
+      // Early fail if 2 wrong
+      if(redeem.wrong >= 2){ finishRedeemQuiz(false); return; }
+    }
+    // Next question
+    redeem.idx += 1;
+    if(redeem.idx >= 3){
+      finishRedeemQuiz(redeem.correct >= 2);
+    }else{
+      renderRedeemQuestion();
     }
   }
 
-  function redeemFail(){
+  function onRedeemTimeExpired(){
+    // Count as wrong and progress or fail
+    redeem.wrong += 1;
+    if(redeem.wrong >= 2){ finishRedeemQuiz(false); return; }
+    redeem.idx += 1;
+    if(redeem.idx >= 3){
+      finishRedeemQuiz(redeem.correct >= 2);
+    }else{
+      renderRedeemQuestion();
+    }
+  }
+
+  function finishRedeemQuiz(passed){
     hide(redeemModal);
-    state.inRedeem = false; state.paused = false;
-    // penalty: respawn to checkpoint/start and reduce some score
+    state.inRedeem = false;
+    if(passed){
+      // resume play without penalty
+      state.paused = false;
+      return;
+    }
+    // fail: clear message and respawn to checkpoint/start
+    state.paused = false;
     state.score = Math.max(0, state.score - 20);
     audio.sfx('fail');
     if(state.player){
@@ -615,7 +659,15 @@
       state.player.y = state.respawn.y || (GROUND_Y - state.player.h);
       state.player.vx = 0; state.player.vy = 0; state.player.onGround = true;
     }
+    // show clear failure message briefly
+    resultsText.textContent = `Redeem failed: 2 incorrect answers. Respawning...`;
+    resultsContinueBtn.classList.add('hidden');
+    show(resultsModal);
+    setTimeout(()=>{ hide(resultsModal); resultsContinueBtn.classList.remove('hidden'); }, 1000);
   }
+
+  // legacy fail (kept in case of other calls)
+  function redeemFail(){ finishRedeemQuiz(false); }
 
   function renderQuiz(){
     const q = quiz.list[quiz.idx];
