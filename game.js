@@ -75,6 +75,68 @@
     social:  { sky:'#cfd8dc', ground:'#1f2937', gate:'#22c55e' }
   };
 
+  // Audio engine (Web Audio API)
+  const audio = {
+    ctx: null,
+    master: null,
+    enabled: true,
+    inited: false,
+    init(){
+      if(this.inited) return;
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if(!Ctx) { this.enabled = false; return; }
+      this.ctx = new Ctx();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = 0.2;
+      this.master.connect(this.ctx.destination);
+      this.inited = true;
+    },
+    resume(){ if(this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
+    can(){ return this.enabled && this.ctx; },
+    beep(freq, dur, type='sine', gain=0.2){
+      if(!this.can()) return;
+      const t = this.ctx.currentTime;
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = type; o.frequency.setValueAtTime(freq, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(gain, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(this.master);
+      o.start(t); o.stop(t + dur + 0.02);
+    },
+    chirp(f0, f1, dur, type='sine', gain=0.15){
+      if(!this.can()) return;
+      const t = this.ctx.currentTime;
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = type; o.frequency.setValueAtTime(Math.max(1,f0), t);
+      o.frequency.exponentialRampToValueAtTime(Math.max(1,f1), t + dur);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(gain, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(this.master);
+      o.start(t); o.stop(t + dur + 0.02);
+    },
+    buzz(freq=120, dur=0.2){ this.beep(freq, dur, 'sawtooth', 0.2); },
+    success(){ this.chirp(600,1200,0.12,'sine',0.2); setTimeout(()=> this.chirp(800,1600,0.12,'sine',0.2), 100); },
+    gate(){ this.chirp(500,1500,0.18,'triangle',0.25); setTimeout(()=> this.chirp(750,2000,0.18,'triangle',0.25), 140); },
+    tick(){ this.beep(900,0.05,'square',0.15); },
+    button(){ this.beep(500,0.05,'square',0.12); },
+    sfx(name){
+      switch(name){
+        case 'jump': this.beep(300,0.06,'square',0.2); break;
+        case 'coin': this.chirp(900,1400,0.09,'triangle',0.2); break;
+        case 'correct': this.success(); break;
+        case 'wrong': this.buzz(140,0.18); break;
+        case 'gate': this.gate(); break;
+        case 'tick': this.tick(); break;
+        case 'fail': this.buzz(100,0.3); break;
+        case 'button': this.button(); break;
+      }
+    }
+  };
+
   // Storage keys
   const KEYS = {
     profile: 'kq_profile',
@@ -131,6 +193,7 @@
 
   function ensureDefaults(){
     const profile = load(KEYS.profile, { name: 'Player', settings: { audio:true, reducedMotion:false } });
+    audio.enabled = !!(profile && profile.settings && profile.settings.audio);
     const progress = load(KEYS.progress, { math:{ stagesUnlocked:1 }, science:{ stagesUnlocked:1 }, english:{ stagesUnlocked:1 }, social:{ stagesUnlocked:1 } });
     const scores = load(KEYS.scores, { math:0, science:0, english:0, social:0 });
     const seen = load(KEYS.questionsSeen, []);
@@ -249,7 +312,7 @@
   bindControl(btnRight, ()=>state.input.right=true, ()=>state.input.right=false);
   bindControl(btnJump, ()=>state.input.jump=true, ()=>state.input.jump=false);
 
-  pauseBtn.addEventListener('click', ()=>{ if(state.screen==='play'){ state.paused = !state.paused; }});
+  pauseBtn.addEventListener('click', ()=>{ if(state.screen==='play'){ state.paused = !state.paused; audio.sfx('button'); }});
 
   // Loop
   let lastTs = 0;
@@ -276,7 +339,7 @@
     // Gravity + Jump
     p.vy += GRAVITY * dt;
     if(state.input.jump && p.onGround && state.input.canJump){
-      p.vy = JUMP_VY; p.onGround = false; state.input.canJump = false;
+      p.vy = JUMP_VY; p.onGround = false; state.input.canJump = false; audio.sfx('jump');
     }
     if(!state.input.jump) state.input.canJump = true;
 
@@ -293,7 +356,7 @@
       if(c.got) continue;
       const dx = (p.x + p.w/2) - c.x; const dy = (p.y + p.h/2) - c.y; const dist2 = dx*dx + dy*dy;
       if(dist2 <= (c.r + Math.min(p.w,p.h)/2)**2){
-        c.got = true; state.stars += 1; state.score += 10;
+        c.got = true; state.stars += 1; state.score += 10; audio.sfx('coin');
       }
     }
 
@@ -424,10 +487,12 @@
   function startRedeemTimer(seconds){
     const end = Date.now() + seconds*1000;
     clearRedeemTimer();
+    redeem.lastS = null;
     redeem.timerId = setInterval(()=>{
       const remaining = Math.max(0, end - Date.now());
       const s = Math.ceil(remaining/1000);
       redeemTimer.textContent = `${s}s`;
+      if(s !== redeem.lastS && s <= 3){ audio.sfx('tick'); redeem.lastS = s; }
       if(remaining <= 0){
         clearRedeemTimer();
         redeemFail();
@@ -447,7 +512,7 @@
       state.inRedeem = false; state.paused = false;
     }else{
       // wrong: allow retry until timer ends
-      flashElement(redeemQuestion, '#ef4444');
+      flashElement(redeemQuestion, '#ef4444'); audio.sfx('wrong');
     }
   }
 
@@ -456,6 +521,7 @@
     state.inRedeem = false; state.paused = false;
     // penalty: respawn to checkpoint/start and reduce some score
     state.score = Math.max(0, state.score - 20);
+    audio.sfx('fail');
     if(state.player){
       state.player.x = state.respawn.x || 40;
       state.player.y = state.respawn.y || (GROUND_Y - state.player.h);
@@ -489,10 +555,11 @@
       // correct
       state.score += quiz.hintUsed ? 35 : 50;
       quiz.correct += 1;
+      audio.sfx('correct');
       nextQuizStep();
     }else{
       // try again
-      flashElement(quizQuestion, '#ef4444');
+      flashElement(quizQuestion, '#ef4444'); audio.sfx('wrong');
     }
   }
 
@@ -528,6 +595,7 @@
       if(perfect){
         // Open the gate and resume the SAME level immediately (no re-init)
         if(state.gate) state.gate.open = true;
+        audio.sfx('gate');
         state.inQuiz = false; state.paused = false;
         return;
       }
@@ -597,6 +665,7 @@
   resultsContinueBtn.addEventListener('click', ()=>{
     hide(resultsModal);
     state.inQuiz = false; state.paused = false;
+    audio.sfx('button');
     gotoWorldSelect();
   });
 
@@ -626,6 +695,7 @@
   function onQuizTimeExpired(){
     // Count as incorrect and move to next question
     flashElement(quizQuestion, '#ef4444');
+    audio.sfx('wrong');
     nextQuizStep();
   }
 
@@ -648,7 +718,7 @@
   }
 
   // Wire up top-level buttons
-  playBtn.addEventListener('click', ()=> gotoWorldSelect());
+  playBtn.addEventListener('click', ()=>{ audio.init(); audio.resume(); gotoWorldSelect(); });
   backToStart.addEventListener('click', ()=> gotoStart());
   btnWorldMath.addEventListener('click', ()=>{ gotoLevelSelect('math'); });
   btnWorldScience.addEventListener('click', ()=>{ gotoLevelSelect('science'); });
