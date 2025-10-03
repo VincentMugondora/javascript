@@ -1,3 +1,6 @@
+  // How To Play modal
+  const howToPlayModal = document.getElementById('howToPlayModal');
+  const howCloseBtn = document.getElementById('howCloseBtn');
 'use strict';
 
 // Knowledge Quest — Prototype (Vanilla JS)
@@ -37,6 +40,7 @@
   const btnLeft = document.getElementById('btnLeft');
   const btnRight = document.getElementById('btnRight');
   const btnJump = document.getElementById('btnJump');
+  const howToPlayBtn = document.getElementById('howToPlayBtn');
 
   const quizModal = document.getElementById('quizModal');
   const quizCounter = document.getElementById('quizCounter');
@@ -304,12 +308,12 @@
   // Screens
   function gotoStart(){
     state.screen = 'start';
-    hide(worldSelectScreen); hide(levelSelectScreen); hide(canvas); hide(hud); hide(touchControls); hide(quizModal); hide(resultsModal); hide(redeemModal); hide(levelModal);
+    hide(worldSelectScreen); hide(levelSelectScreen); hide(canvas); hide(hud); hide(touchControls); hide(quizModal); hide(resultsModal); hide(redeemModal); hide(levelModal); hide(howToPlayModal);
     show(startScreen);
   }
   function gotoWorldSelect(){
     state.screen = 'worldSelect';
-    hide(startScreen); hide(levelSelectScreen); hide(canvas); hide(hud); hide(touchControls); hide(quizModal); hide(resultsModal); hide(redeemModal); hide(levelModal);
+    hide(startScreen); hide(levelSelectScreen); hide(canvas); hide(hud); hide(touchControls); hide(quizModal); hide(resultsModal); hide(redeemModal); hide(levelModal); hide(howToPlayModal);
     show(worldSelectScreen);
   }
 
@@ -347,7 +351,7 @@
   function startGame(world, level){
     initLevel(world, level);
     state.screen = 'play';
-    hide(startScreen); hide(worldSelectScreen); hide(levelSelectScreen); hide(resultsModal); hide(quizModal); hide(redeemModal); hide(levelModal);
+    hide(startScreen); hide(worldSelectScreen); hide(levelSelectScreen); hide(resultsModal); hide(quizModal); hide(redeemModal); hide(levelModal); hide(howToPlayModal);
     show(canvas); show(hud); show(touchControls);
   }
 
@@ -388,6 +392,8 @@
   bindControl(btnJump, ()=>state.input.jump=true, ()=>state.input.jump=false);
 
   pauseBtn.addEventListener('click', ()=>{ if(state.screen==='play'){ state.paused = !state.paused; audio.sfx('button'); }});
+  howToPlayBtn.addEventListener('click', ()=>{ show(howToPlayModal); audio.sfx('button'); });
+  howCloseBtn.addEventListener('click', ()=>{ hide(howToPlayModal); audio.sfx('button'); });
 
   // Loop
   let lastTs = 0;
