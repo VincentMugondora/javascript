@@ -230,6 +230,34 @@
     try{ const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : def; }catch(e){ return def; }
   }
   function save(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){} }
+  // Seen questions tracking
+  let _seenSet = null;
+  function qid(q){
+    if(!q) return '';
+    if(q.id) return String(q.id);
+    if(q._id) return String(q._id);
+    // fallback: stable hash of world+question+choices
+    const base = `${q.world||''}|${q.question||''}|${Array.isArray(q.choices)?q.choices.join('|'):''}`;
+    let h = 0; for(let i=0;i<base.length;i++){ h = ((h<<5)-h) + base.charCodeAt(i); h |= 0; }
+    return `kq_${q.world||'x'}_${(h>>>0).toString(36)}`;
+  }
+  function getSeenSet(){
+    if(!_seenSet){
+      const arr = load(KEYS.questionsSeen, []);
+      _seenSet = new Set(Array.isArray(arr) ? arr : []);
+    }
+    return _seenSet;
+  }
+  function hasSeen(id){ return !!id && getSeenSet().has(String(id)); }
+  function markSeen(id){
+    if(!id) return;
+    const s = getSeenSet();
+    const key = String(id);
+    if(!s.has(key)){
+      s.add(key);
+      save(KEYS.questionsSeen, Array.from(s));
+    }
+  }
 
   function ensureDefaults(){
     const profile = load(KEYS.profile, { name: 'Player', settings: { audio:true, reducedMotion:false } });
@@ -484,16 +512,21 @@
     state.inQuiz = true; state.paused = true;
     // build list: 3 questions from current world
     const pool = QUESTION_BANK.filter(q => q.world === state.world);
-    shuffleInPlace(pool);
-    quiz.list = pool.slice(0, Math.min(3, pool.length));
-    while(quiz.list.length < 3){ // fallback fill from defaults of same world
-      const extra = DEFAULT_QUESTIONS.filter(q=>q.world===state.world);
-      shuffleInPlace(extra);
-      for(const q of extra){ if(!quiz.list.find(x=>x.id===q.id)) quiz.list.push(q); if(quiz.list.length>=3) break; }
-      if(quiz.list.length>=3) break;
-      // if still short, pad with any question
-      if(quiz.list.length<3){ quiz.list.push(DEFAULT_QUESTIONS[0]); }
+    const unseen = shuffleInPlace(pool.filter(q=>!hasSeen(qid(q))));
+    const list = unseen.slice(0, 3);
+    if(list.length < 3){
+      const rest = shuffleInPlace(pool.filter(q=>!list.find(x=>qid(x)===qid(q))));
+      for(const q of rest){ if(!list.find(x=>qid(x)===qid(q))) list.push(q); if(list.length>=3) break; }
     }
+    if(list.length < 3){
+      const fallbacks = shuffleInPlace(DEFAULT_QUESTIONS.filter(q=>q.world===state.world && !list.find(x=>qid(x)===qid(q))));
+      for(const q of fallbacks){ if(!list.find(x=>qid(x)===qid(q))) list.push(q); if(list.length>=3) break; }
+    }
+    if(list.length < 3){ // absolute last resort: allow any default
+      const any = shuffleInPlace(DEFAULT_QUESTIONS.filter(q=>!list.find(x=>qid(x)===qid(q))));
+      for(const q of any){ if(!list.find(x=>qid(x)===qid(q))) list.push(q); if(list.length>=3) break; }
+    }
+    quiz.list = list.slice(0,3);
     quiz.idx = 0; quiz.correct = 0; quiz.hintUsed = false;
     show(quizModal); renderQuiz();
   }
@@ -507,7 +540,10 @@
     state.inRedeem = true; state.paused = true;
     // pick a single question from current world
     const pool = QUESTION_BANK.filter(q => q.world === state.world);
-    const q = pool[Math.floor(Math.random()*pool.length)] || DEFAULT_QUESTIONS[0];
+    const unseen = pool.filter(q=>!hasSeen(qid(q)));
+    const from = unseen.length ? unseen : pool;
+    const q = from[Math.floor(Math.random()*from.length)] || (DEFAULT_QUESTIONS.find(q=>q.world===state.world) || DEFAULT_QUESTIONS[0]);
+    markSeen(qid(q));
     redeem.q = q;
     redeemWorld.textContent = prettyWorld(state.world);
     redeemQuestion.textContent = q.question;
@@ -571,6 +607,7 @@
 
   function renderQuiz(){
     const q = quiz.list[quiz.idx];
+    markSeen(qid(q));
     quizCounter.textContent = `Q${quiz.idx+1}/3`;
     quizWorld.textContent = prettyWorld(q.world);
     quizQuestion.textContent = q.question;
