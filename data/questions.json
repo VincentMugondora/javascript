@@ -1,0 +1,8 @@
+[
+  {"id":"math_frac_001","world":"math","topic":"fractions","difficulty":"easy","question":"Which fraction is equivalent to 1/2?","choices":["2/4","1/3","3/5","2/3"],"answerIndex":0,"hint":"Multiply numerator and denominator by the same number.","explanation":"1/2 = 2/4."},
+  {"id":"math_area_002","world":"math","topic":"area","difficulty":"easy","question":"What is the area of a rectangle 6 by 3?","choices":["9","12","18","24"],"answerIndex":2,"hint":"Area = length × width.","explanation":"6×3 = 18."},
+  {"id":"math_lcm_003","world":"math","topic":"multiples","difficulty":"easy","question":"What is the LCM of 4 and 6?","choices":["6","8","10","12"],"answerIndex":3,"hint":"List multiples: 4,8,12,... and 6,12,...","explanation":"LCM is 12."},
+  {"id":"sci_water_003","world":"science","topic":"water_cycle","difficulty":"easy","question":"Which step turns water vapor into liquid?","choices":["Evaporation","Condensation","Precipitation","Runoff"],"answerIndex":1,"hint":"It forms droplets on a cold surface.","explanation":"Condensation turns vapor to liquid."},
+  {"id":"eng_grammar_010","world":"english","topic":"grammar","difficulty":"medium","question":"Choose the correct sentence.","choices":["The dogs runs fast.","The dog run fast.","The dog runs fast.","The dogs is fast."],"answerIndex":2,"hint":"Match subject and verb number.","explanation":"Singular subject 'dog' → 'runs'."},
+  {"id":"soc_geo_005","world":"social","topic":"geography","difficulty":"easy","question":"What does 0° latitude represent?","choices":["Prime Meridian","Tropic of Cancer","Equator","Arctic Circle"],"answerIndex":2,"hint":"It's halfway between poles.","explanation":"The Equator is 0° latitude."}
+]
