@@ -81,6 +81,19 @@
     master: null,
     enabled: true,
     inited: false,
+    loaded: false,
+    // map SFX keys to asset urls (user should place files in javascript/assets/audio/)
+    files: {
+      jump: 'assets/audio/jump.wav',
+      coin: 'assets/audio/coin.wav',
+      correct: 'assets/audio/correct.mp3',
+      wrong: 'assets/audio/wrong.wav',
+      gate: 'assets/audio/gate_open.mp3',
+      tick: 'assets/audio/tick.wav',
+      fail: 'assets/audio/fail.wav',
+      button: 'assets/audio/click.wav'
+    },
+    elems: {},
     init(){
       if(this.inited) return;
       const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -93,6 +106,30 @@
     },
     resume(){ if(this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
     can(){ return this.enabled && this.ctx; },
+    loadAssets(){
+      if(this.loaded) return;
+      // Preload HTMLAudio elements for each mapped file
+      Object.entries(this.files).forEach(([key, url])=>{
+        const el = new Audio(url);
+        el.preload = 'auto';
+        el.volume = 0.6; // master-ish volume for assets
+        // prime by loading metadata (non-blocking)
+        el.addEventListener('error', ()=>{ /* keep fallback on error */ });
+        this.elems[key] = el;
+      });
+      this.loaded = true;
+    },
+    playAsset(name){
+      const src = this.elems[name];
+      if(!src) return false;
+      try{
+        // clone to allow overlapping plays
+        const el = src.cloneNode(true);
+        el.volume = src.volume;
+        el.play().catch(()=>{});
+        return true;
+      }catch(e){ return false; }
+    },
     beep(freq, dur, type='sine', gain=0.2){
       if(!this.can()) return;
       const t = this.ctx.currentTime;
@@ -124,6 +161,9 @@
     tick(){ this.beep(900,0.05,'square',0.15); },
     button(){ this.beep(500,0.05,'square',0.12); },
     sfx(name){
+      // Prefer asset-based playback
+      if(this.playAsset(name)) return;
+      // Fallback to synth if asset missing or blocked
       switch(name){
         case 'jump': this.beep(300,0.06,'square',0.2); break;
         case 'coin': this.chirp(900,1400,0.09,'triangle',0.2); break;
@@ -592,29 +632,13 @@
       const prev = scores[w] || 0;
       scores[w] = Math.max(prev, state.score);
       save(KEYS.scores, scores);
-      if(perfect){
-        // Open the gate and resume the SAME level immediately (no re-init)
-        if(state.gate) state.gate.open = true;
-        audio.sfx('gate');
-        state.inQuiz = false; state.paused = false;
-        return;
-      }
-      // Auto-advance: if next level exists, show brief results first for non-perfect pass
-      resultsContinueBtn.classList.add('hidden');
-      show(resultsModal);
-      setTimeout(()=>{
-        hide(resultsModal);
-        state.inQuiz = false; state.paused = false;
-        if(state.level < 3){
-          startGame(state.world, state.level + 1);
-        }else{
-          // World complete
-          gotoWorldSelect();
-        }
-      }, 1200);
-      return; // prevent showing modal twice
+      // Open the gate and resume the SAME level immediately (for 2/3 or 3/3)
+      if(state.gate) state.gate.open = true;
+      audio.sfx('gate');
+      state.inQuiz = false; state.paused = false;
+      return;
     }else{
-      resultsText.textContent = `You got ${quiz.correct}/3. Try again to pass the gate!`;
+      resultsText.textContent = `You answered ${quiz.correct}/3. Need 2/3 to open the gate. Time-outs count as incorrect. Try again!`;
       resultsContinueBtn.classList.remove('hidden');
     }
     show(resultsModal);
@@ -718,7 +742,7 @@
   }
 
   // Wire up top-level buttons
-  playBtn.addEventListener('click', ()=>{ audio.init(); audio.resume(); gotoWorldSelect(); });
+  playBtn.addEventListener('click', ()=>{ audio.init(); audio.resume(); audio.loadAssets(); gotoWorldSelect(); });
   backToStart.addEventListener('click', ()=> gotoStart());
   btnWorldMath.addEventListener('click', ()=>{ gotoLevelSelect('math'); });
   btnWorldScience.addEventListener('click', ()=>{ gotoLevelSelect('science'); });
