@@ -29,12 +29,26 @@
       <button id="backToStart" class="secondary">Back</button>
     </div>
   </section>
+  
+  <!-- Level Select Screen -->
+  <section id="levelSelectScreen" class="screen hidden">
+    <h2>Select Level</h2>
+    <div class="world-grid">
+      <button id="btnLevel1" class="world">Level 1</button>
+      <button id="btnLevel2" class="world" disabled>Level 2</button>
+      <button id="btnLevel3" class="world" disabled>Level 3</button>
+    </div>
+    <div class="actions">
+      <button id="backToWorlds" class="secondary">Back</button>
+    </div>
+  </section>
 
   <!-- HUD -->
   <header id="hud" class="hidden">
     <div>Score: <span id="scoreVal">0</span></div>
     <div>★: <span id="starsVal">0</span></div>
     <div>World: <span id="worldVal">-</span></div>
+    <div>Level: <span id="levelVal">1</span></div>
     <div class="spacer"></div>
     <button id="pauseBtn" class="secondary small">Pause</button>
   </header>
@@ -66,6 +80,17 @@
     <div id="quizChoices" class="choices"></div>
     <button id="hintBtn" class="secondary">Show Hint</button>
     <p id="quizHint" class="hint hidden"></p>
+  </section>
+  
+  <!-- Redeem Modal -->
+  <section id="redeemModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="redeemTitle">
+    <h3 id="redeemTitle">Redeem Chance</h3>
+    <div class="quiz-meta">
+      <span id="redeemTimer">10s</span>
+      <span id="redeemWorld">-</span>
+    </div>
+    <p id="redeemQuestion">Loading...</p>
+    <div id="redeemChoices" class="choices"></div>
   </section>
 
   <!-- Results Modal -->

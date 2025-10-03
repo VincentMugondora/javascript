@@ -2,7 +2,7 @@
 
 // Knowledge Quest — Prototype (Vanilla JS)
 // Screens: start -> worldSelect -> play -> quiz -> results
-// World in MVP: Math Jungle
+// Worlds: Math, Science, English, Social (subject-themed)
 
 (function(){
   // DOM refs
@@ -15,10 +15,18 @@
   const btnWorldEnglish = document.getElementById('btnWorldEnglish');
   const btnWorldSocial = document.getElementById('btnWorldSocial');
 
+  // Level select
+  const levelSelectScreen = document.getElementById('levelSelectScreen');
+  const btnLevel1 = document.getElementById('btnLevel1');
+  const btnLevel2 = document.getElementById('btnLevel2');
+  const btnLevel3 = document.getElementById('btnLevel3');
+  const backToWorlds = document.getElementById('backToWorlds');
+
   const hud = document.getElementById('hud');
   const scoreVal = document.getElementById('scoreVal');
   const starsVal = document.getElementById('starsVal');
   const worldVal = document.getElementById('worldVal');
+  const levelVal = document.getElementById('levelVal');
   const pauseBtn = document.getElementById('pauseBtn');
 
   const canvas = document.getElementById('gameCanvas');
@@ -41,6 +49,13 @@
   const resultsText = document.getElementById('resultsText');
   const resultsContinueBtn = document.getElementById('resultsContinueBtn');
 
+  // Redeem modal
+  const redeemModal = document.getElementById('redeemModal');
+  const redeemTimer = document.getElementById('redeemTimer');
+  const redeemWorld = document.getElementById('redeemWorld');
+  const redeemQuestion = document.getElementById('redeemQuestion');
+  const redeemChoices = document.getElementById('redeemChoices');
+
   // Constants
   const CANVAS_W = canvas.width;
   const CANVAS_H = canvas.height;
@@ -49,6 +64,14 @@
   const GRAVITY = 1500; // px/s^2
   const MOVE_SPEED = 280; // px/s
   const JUMP_VY = -560; // px/s
+
+  // World themes (colors)
+  const THEMES = {
+    math:    { sky:'#93c5fd', ground:'#065f46', gate:'#4338ca' },
+    science: { sky:'#fde68a', ground:'#7c2d12', gate:'#ea580c' },
+    english: { sky:'#c7d2fe', ground:'#3730a3', gate:'#a78bfa' },
+    social:  { sky:'#cfd8dc', ground:'#1f2937', gate:'#22c55e' }
+  };
 
   // Storage keys
   const KEYS = {
@@ -63,13 +86,19 @@
     screen: 'start',
     paused: false,
     world: null,
+    selectedWorld: null,
+    level: 1,
     score: 0,
     stars: 0,
     inQuiz: false,
+    inRedeem: false,
     // gameplay
     player: null,
     coins: [],
+    obstacles: [],
     gate: null,
+    respawn: { x: 0, y: 0 },
+    checkpointX: 0,
     // input
     input: { left:false, right:false, jump:false, canJump:true }
   };
@@ -99,9 +128,20 @@
 
   function ensureDefaults(){
     const profile = load(KEYS.profile, { name: 'Player', settings: { audio:true, reducedMotion:false } });
-    const progress = load(KEYS.progress, { math:{ stagesUnlocked:1 }, science:{ stagesUnlocked:0 }, english:{ stagesUnlocked:0 }, social:{ stagesUnlocked:0 } });
+    const progress = load(KEYS.progress, { math:{ stagesUnlocked:1 }, science:{ stagesUnlocked:1 }, english:{ stagesUnlocked:1 }, social:{ stagesUnlocked:1 } });
     const scores = load(KEYS.scores, { math:0, science:0, english:0, social:0 });
     const seen = load(KEYS.questionsSeen, []);
+
+    // Normalize: ensure all subjects at least unlocked (stage 1)
+    progress.math = progress.math || { stagesUnlocked:1 };
+    progress.science = progress.science || { stagesUnlocked:1 };
+    progress.english = progress.english || { stagesUnlocked:1 };
+    progress.social = progress.social || { stagesUnlocked:1 };
+    if((progress.math.stagesUnlocked ?? 0) <= 0) progress.math.stagesUnlocked = 1;
+    if((progress.science.stagesUnlocked ?? 0) <= 0) progress.science.stagesUnlocked = 1;
+    if((progress.english.stagesUnlocked ?? 0) <= 0) progress.english.stagesUnlocked = 1;
+    if((progress.social.stagesUnlocked ?? 0) <= 0) progress.social.stagesUnlocked = 1;
+
     save(KEYS.profile, profile); save(KEYS.progress, progress); save(KEYS.scores, scores); save(KEYS.questionsSeen, seen);
     // Unlock buttons based on progress
     btnWorldMath.disabled = progress.math.stagesUnlocked <= 0;
@@ -124,42 +164,56 @@
   // Screens
   function gotoStart(){
     state.screen = 'start';
-    hide(worldSelectScreen); hide(canvas); hide(hud); hide(touchControls); hide(quizModal); hide(resultsModal);
+    hide(worldSelectScreen); hide(levelSelectScreen); hide(canvas); hide(hud); hide(touchControls); hide(quizModal); hide(resultsModal); hide(redeemModal);
     show(startScreen);
   }
   function gotoWorldSelect(){
     state.screen = 'worldSelect';
-    hide(startScreen); hide(canvas); hide(hud); hide(touchControls); hide(quizModal); hide(resultsModal);
+    hide(startScreen); hide(levelSelectScreen); hide(canvas); hide(hud); hide(touchControls); hide(quizModal); hide(resultsModal); hide(redeemModal);
     show(worldSelectScreen);
   }
 
-  // Gameplay
-  function initLevel(world){
-    state.world = world; state.score = 0; state.stars = 0; state.paused = false; state.inQuiz = false;
-    worldVal.textContent = prettyWorld(world);
-    // Player
-    state.player = { x: 40, y: GROUND_Y-50, w: 40, h: 50, vx:0, vy:0, onGround:true };
-    // Coins
-    state.coins = [
-      {x:160,y:GROUND_Y-80, r:10, got:false},
-      {x:260,y:GROUND_Y-120, r:10, got:false},
-      {x:420,y:GROUND_Y-60, r:10, got:false},
-      {x:620,y:GROUND_Y-100, r:10, got:false},
-      {x:760,y:GROUND_Y-80, r:10, got:false}
-    ];
-    // Gate
-    state.gate = { x: 840, y: GROUND_Y-60, w: 40, h: 60, open:false };
+  function gotoLevelSelect(world){
+    state.selectedWorld = world;
+    state.screen = 'levelSelect';
+    hide(startScreen); hide(worldSelectScreen); hide(canvas); hide(hud); hide(touchControls); hide(quizModal); hide(resultsModal); hide(redeemModal);
+    // Enable levels based on progress for that world
+    const progress = load(KEYS.progress, { [world]: { stagesUnlocked: 1 } });
+    const unlocked = (progress[world] && progress[world].stagesUnlocked) || 1;
+    btnLevel1.disabled = false;
+    btnLevel2.disabled = unlocked < 2;
+    btnLevel3.disabled = unlocked < 3;
+    show(levelSelectScreen);
   }
 
-  function startGame(world){
-    initLevel(world);
+  // Gameplay
+  function initLevel(world, level){
+    state.world = world; state.level = level; state.score = 0; state.stars = 0; state.paused = false; state.inQuiz = false; state.inRedeem = false; state.checkpointX = 0;
+    worldVal.textContent = prettyWorld(world);
+    levelVal.textContent = String(level);
+    // Player
+    state.player = { x: 40, y: GROUND_Y-50, w: 40, h: 50, vx:0, vy:0, onGround:true };
+    state.respawn = { x: 40, y: GROUND_Y-50 };
+    // Layout based on level
+    const layout = buildLevelLayout(level);
+    state.coins = layout.coins;
+    state.obstacles = layout.obstacles;
+    state.gate = { x: layout.gateX, y: GROUND_Y-60, w: 40, h: 60, open:false };
+  }
+
+  function startGame(world, level){
+    initLevel(world, level);
     state.screen = 'play';
-    hide(startScreen); hide(worldSelectScreen); hide(resultsModal); hide(quizModal);
+    hide(startScreen); hide(worldSelectScreen); hide(levelSelectScreen); hide(resultsModal); hide(quizModal); hide(redeemModal);
     show(canvas); show(hud); show(touchControls);
   }
 
   function prettyWorld(w){
     switch(w){ case 'math': return 'Math Jungle'; case 'science': return 'Science Desert'; case 'english': return 'English Castle'; case 'social': return 'Social City'; default: return '-'; }
+  }
+
+  function themeFor(world){
+    return THEMES[world] || { sky:'#93c5fd', ground:'#065f46', gate:'#4338ca' };
   }
 
   // Input
@@ -198,7 +252,7 @@
     requestAnimationFrame(loop);
     const dt = Math.min(0.033, (ts - (lastTs||ts)) / 1000);
     lastTs = ts;
-    if(state.screen !== 'play' || state.paused || state.inQuiz) return; // stop updating when not playing
+    if(state.screen !== 'play' || state.paused || state.inQuiz || state.inRedeem) return; // stop updating when not playing
     update(dt);
     render();
   }
@@ -238,6 +292,21 @@
       }
     }
 
+    // Checkpoint (mid-level)
+    if(!state.checkpointX && p.x > CANVAS_W*0.5){
+      state.checkpointX = Math.floor(CANVAS_W*0.5);
+      state.respawn.x = state.checkpointX;
+      state.respawn.y = GROUND_Y - p.h;
+    }
+
+    // Obstacles collision
+    for(const o of state.obstacles){
+      if(aabb(p.x,p.y,p.w,p.h, o.x,o.y,o.w,o.h)){
+        onHitObstacle();
+        break;
+      }
+    }
+
     // Gate trigger
     const g = state.gate;
     if(!g.open && p.x + p.w >= g.x){
@@ -251,11 +320,20 @@
 
   function render(){
     ctx.clearRect(0,0,CANVAS_W,CANVAS_H);
-    // Background (simple sky gradient simulated by CSS background on canvas)
+    // Sky background (per-world)
+    const t = themeFor(state.world);
+    ctx.fillStyle = t.sky;
+    ctx.fillRect(0, 0, CANVAS_W, GROUND_Y);
 
     // Ground
-    ctx.fillStyle = '#065f46';
+    ctx.fillStyle = t.ground;
     ctx.fillRect(0, GROUND_Y, CANVAS_W, CANVAS_H - GROUND_Y);
+
+    // Obstacles
+    ctx.fillStyle = '#dc2626';
+    for(const o of state.obstacles){
+      ctx.fillRect(o.x, o.y, o.w, o.h);
+    }
 
     // Coins
     for(const c of state.coins){
@@ -266,7 +344,7 @@
 
     // Gate
     const g = state.gate;
-    ctx.fillStyle = g.open ? '#22c55e' : '#4338ca';
+    ctx.fillStyle = g.open ? '#22c55e' : t.gate;
     ctx.fillRect(g.x, g.y, g.w, g.h);
 
     // Player
@@ -277,6 +355,9 @@
 
   // Quiz system
   let quiz = { list:[], idx:0, correct:0, hintUsed:false };
+
+  // Redeem quiz (single timed question)
+  let redeem = { q:null, deadline:0, timerId:null };
 
   function openQuiz(){
     if(state.inQuiz) return;
@@ -295,6 +376,74 @@
     }
     quiz.idx = 0; quiz.correct = 0; quiz.hintUsed = false;
     show(quizModal); renderQuiz();
+  }
+
+  function onHitObstacle(){
+    if(state.inRedeem || state.inQuiz) return;
+    triggerRedeem();
+  }
+
+  function triggerRedeem(){
+    state.inRedeem = true; state.paused = true;
+    // pick a single question from current world
+    const pool = QUESTION_BANK.filter(q => q.world === state.world);
+    const q = pool[Math.floor(Math.random()*pool.length)] || DEFAULT_QUESTIONS[0];
+    redeem.q = q;
+    redeemWorld.textContent = prettyWorld(state.world);
+    redeemQuestion.textContent = q.question;
+    redeemChoices.innerHTML = '';
+    q.choices.forEach((choice, i)=>{
+      const b = document.createElement('button');
+      b.className = 'primary'; b.textContent = choice;
+      b.addEventListener('click', ()=> onRedeemAnswer(i));
+      redeemChoices.appendChild(b);
+    });
+    // timer: harder at higher levels
+    const seconds = state.level === 1 ? 10 : state.level === 2 ? 8 : 6;
+    startRedeemTimer(seconds);
+    show(redeemModal);
+  }
+
+  function startRedeemTimer(seconds){
+    const end = Date.now() + seconds*1000;
+    clearRedeemTimer();
+    redeem.timerId = setInterval(()=>{
+      const remaining = Math.max(0, end - Date.now());
+      const s = Math.ceil(remaining/1000);
+      redeemTimer.textContent = `${s}s`;
+      if(remaining <= 0){
+        clearRedeemTimer();
+        redeemFail();
+      }
+    }, 100);
+  }
+
+  function clearRedeemTimer(){ if(redeem.timerId){ clearInterval(redeem.timerId); redeem.timerId = null; } }
+
+  function onRedeemAnswer(index){
+    const q = redeem.q;
+    if(!q) return;
+    if(index === q.answerIndex){
+      // success: continue without penalty
+      clearRedeemTimer();
+      hide(redeemModal);
+      state.inRedeem = false; state.paused = false;
+    }else{
+      // wrong: allow retry until timer ends
+      flashElement(redeemQuestion, '#ef4444');
+    }
+  }
+
+  function redeemFail(){
+    hide(redeemModal);
+    state.inRedeem = false; state.paused = false;
+    // penalty: respawn to checkpoint/start and reduce some score
+    state.score = Math.max(0, state.score - 20);
+    if(state.player){
+      state.player.x = state.respawn.x || 40;
+      state.player.y = state.respawn.y || (GROUND_Y - state.player.h);
+      state.player.vx = 0; state.player.vy = 0; state.player.onGround = true;
+    }
   }
 
   function renderQuiz(){
@@ -342,17 +491,49 @@
     if(pass){
       resultsText.textContent = `Great! You answered ${quiz.correct}/3 correctly. Gate opens! +100 bonus`;
       state.score += 100; // end-of-stage bonus for passing
-      // unlock next stage in math (simple demo)
-      if(state.world==='math') progress.math.stagesUnlocked = Math.max(2, progress.math.stagesUnlocked||1);
+      // unlock next level for current world
+      const w = state.world;
+      progress[w] = progress[w] || { stagesUnlocked:1 };
+      const next = Math.min(3, (state.level||1) + 1);
+      progress[w].stagesUnlocked = Math.max((progress[w].stagesUnlocked || 1), next);
       save(KEYS.progress, progress);
-      // update high score
+      // update high score for current world
       const scores = load(KEYS.scores, {});
-      scores.math = Math.max(scores.math||0, state.score);
+      const prev = scores[w] || 0;
+      scores[w] = Math.max(prev, state.score);
       save(KEYS.scores, scores);
     }else{
       resultsText.textContent = `You got ${quiz.correct}/3. Try again to pass the gate!`;
     }
     show(resultsModal);
+  }
+
+  // Level layout helper
+  function buildLevelLayout(level){
+    const coins = [];
+    const obstacles = [];
+    const gateX = level === 1 ? 840 : level === 2 ? 880 : 900;
+    // coins per level
+    const coinCount = level === 1 ? 5 : level === 2 ? 7 : 9;
+    for(let i=0;i<coinCount;i++){
+      const x = 140 + i * Math.floor((gateX - 240) / coinCount);
+      const y = GROUND_Y - 60 - (i % 3)*20; // small variation
+      coins.push({ x, y, r:10, got:false });
+    }
+    // obstacles per level
+    const obsCount = level === 1 ? 3 : level === 2 ? 5 : 7;
+    for(let i=0;i<obsCount;i++){
+      const w = 30, h = 30;
+      const x = 220 + i * Math.floor((gateX - 300) / obsCount);
+      const y = GROUND_Y - h;
+      obstacles.push({ x, y, w, h });
+    }
+    return { coins, obstacles, gateX };
+  }
+
+  // Collision helper
+  function aabb(x1,y1,w1,h1, x2,y2,w2,h2){
+    return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
   }
 
   hintBtn.addEventListener('click', ()=>{
@@ -375,10 +556,16 @@
   // Wire up top-level buttons
   playBtn.addEventListener('click', ()=> gotoWorldSelect());
   backToStart.addEventListener('click', ()=> gotoStart());
-  btnWorldMath.addEventListener('click', ()=>{ worldVal.textContent = 'Math Jungle'; startGame('math'); });
-  btnWorldScience.addEventListener('click', ()=>{});
-  btnWorldEnglish.addEventListener('click', ()=>{});
-  btnWorldSocial.addEventListener('click', ()=>{});
+  btnWorldMath.addEventListener('click', ()=>{ gotoLevelSelect('math'); });
+  btnWorldScience.addEventListener('click', ()=>{ gotoLevelSelect('science'); });
+  btnWorldEnglish.addEventListener('click', ()=>{ gotoLevelSelect('english'); });
+  btnWorldSocial.addEventListener('click', ()=>{ gotoLevelSelect('social'); });
+
+  // Level selection
+  btnLevel1.addEventListener('click', ()=>{ if(state.selectedWorld) startGame(state.selectedWorld, 1); });
+  btnLevel2.addEventListener('click', ()=>{ if(state.selectedWorld) startGame(state.selectedWorld, 2); });
+  btnLevel3.addEventListener('click', ()=>{ if(state.selectedWorld) startGame(state.selectedWorld, 3); });
+  backToWorlds.addEventListener('click', ()=> gotoWorldSelect());
 
   // Init
   (async function init(){
