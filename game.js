@@ -483,9 +483,9 @@
   }
 
   function onAnswer(index){
-    clearQuizTimer();
     const q = quiz.list[quiz.idx];
     if(index === q.answerIndex){
+      clearQuizTimer();
       // correct
       state.score += quiz.hintUsed ? 35 : 50;
       quiz.correct += 1;
@@ -628,6 +628,16 @@
     const m = Math.floor(s/60);
     const r = s%60;
     return `${m}:${r.toString().padStart(2,'0')}`;
+  }
+
+  // Per-level time budget (seconds)
+  function levelTimeFor(level){
+    switch(level){
+      case 1: return 60;   // 1:00
+      case 2: return 45;   // 0:45
+      case 3: return 35;   // 0:35
+      default: return 60;
+    }
   }
 
   // Wire up top-level buttons
