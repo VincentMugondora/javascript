@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Grade 6 Adventure Game</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: lightblue; }
+    canvas { display: block; margin: auto; background: #87CEEB; }
+    #questionBox {
+      display: none;
+      position: absolute;
+      top: 30%;
+      left: 35%;
+      background: white;
+      border: 3px solid black;
+      padding: 20px;
+      font-size: 18px;
+    }
+    button { margin: 5px; padding: 8px 16px; }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="800" height="400"></canvas>
+  <div id="questionBox">
+    <p id="question"></p>
+    <div id="answers"></div>
+  </div>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let player = { x: 50, y: 350, width: 40, height: 40, color: "red" };
+let goal = { x: 700, y: 350, width: 40, height: 40, color: "green" };
+let speed = 5;
+let gamePaused = false;
+
+// Questions
+const questions = [
+  { q: "What is 5 × 6?", options: ["11", "30", "20"], answer: "30" },
+  { q: "Which process forms clouds?", options: ["Condensation", "Evaporation", "Precipitation"], answer: "Condensation" },
+  { q: "Choose the correct spelling:", options: ["Enviroment", "Environment", "Environmant"], answer: "Environment" }
+];
+let currentQuestion = 0;
+
+function drawPlayer() {
+  ctx.fillStyle = player.color;
+  ctx.fillRect(player.x, player.y, player.width, player.height);
+}
+
+function drawGoal() {
+  ctx.fillStyle = goal.color;
+  ctx.fillRect(goal.x, goal.y, goal.width, goal.height);
+}
+
+function update() {
+  if (!gamePaused) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawPlayer();
+    drawGoal();
+
+    // Check collision with goal
+    if (player.x + player.width > goal.x && player.x < goal.x + goal.width) {
+      gamePaused = true;
+      askQuestion();
+    }
+  }
+}
+
+function askQuestion() {
+  let qBox = document.getElementById("questionBox");
+  qBox.style.display = "block";
+  document.getElementById("question").innerText = questions[currentQuestion].q;
+  let answersDiv = document.getElementById("answers");
+  answersDiv.innerHTML = "";
+  questions[currentQuestion].options.forEach(option => {
+    let btn = document.createElement("button");
+    btn.innerText = option;
+    btn.onclick = () => checkAnswer(option);
+    answersDiv.appendChild(btn);
+  });
+}
+
+function checkAnswer(option) {
+  if (option === questions[currentQuestion].answer) {
+    alert("✅ Correct!");
+    currentQuestion++;
+    if (currentQuestion < questions.length) {
+      player.x = 50; // Reset position
+      gamePaused = false;
+      document.getElementById("questionBox").style.display = "none";
+    } else {
+      document.getElementById("questionBox").innerHTML = "<h2>🎉 You completed Knowledge Land!</h2>";
+    }
+  } else {
+    alert("❌ Try again!");
+  }
+}
+
+// Movement
+document.addEventListener("keydown", (e) => {
+  if (!gamePaused) {
+    if (e.key === "ArrowRight") player.x += speed;
+    if (e.key === "ArrowLeft") player.x -= speed;
+  }
+});
+
+setInterval(update, 30);
+</script>
+</body>
+</html>

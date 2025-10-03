@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Knowledge Quest — Prototype</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Start Screen -->
+  <section id="startScreen" class="screen">
+    <h1>Knowledge Quest</h1>
+    <p class="subtitle">Adventure to Wisdom</p>
+    <div class="actions">
+      <button id="playBtn" class="primary">Play</button>
+    </div>
+  </section>
+
+  <!-- World Select Screen -->
+  <section id="worldSelectScreen" class="screen hidden">
+    <h2>Select a World</h2>
+    <div class="world-grid">
+      <button id="btnWorldMath" class="world math">Math Jungle</button>
+      <button id="btnWorldScience" class="world science" disabled>Science Desert</button>
+      <button id="btnWorldEnglish" class="world english" disabled>English Castle</button>
+      <button id="btnWorldSocial" class="world social" disabled>Social Studies City</button>
+    </div>
+    <div class="actions">
+      <button id="backToStart" class="secondary">Back</button>
+    </div>
+  </section>
+
+  <!-- HUD -->
+  <header id="hud" class="hidden">
+    <div>Score: <span id="scoreVal">0</span></div>
+    <div>★: <span id="starsVal">0</span></div>
+    <div>World: <span id="worldVal">-</span></div>
+    <div class="spacer"></div>
+    <button id="pauseBtn" class="secondary small">Pause</button>
+  </header>
+
+  <!-- Game Canvas -->
+  <main class="game-wrap">
+    <canvas id="gameCanvas" class="hidden" width="960" height="540"></canvas>
+  </main>
+
+  <!-- Touch Controls -->
+  <div id="touchControls" class="hidden">
+    <div class="cluster">
+      <button id="btnLeft" class="control">◀</button>
+      <button id="btnRight" class="control">▶</button>
+    </div>
+    <div class="cluster">
+      <button id="btnJump" class="control primary">Jump</button>
+    </div>
+  </div>
+
+  <!-- Quiz Modal -->
+  <section id="quizModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="quizTitle">
+    <h3 id="quizTitle">Quiz Gate</h3>
+    <div class="quiz-meta">
+      <span id="quizCounter">Q1/3</span>
+      <span id="quizWorld">Math</span>
+    </div>
+    <p id="quizQuestion">Loading...</p>
+    <div id="quizChoices" class="choices"></div>
+    <button id="hintBtn" class="secondary">Show Hint</button>
+    <p id="quizHint" class="hint hidden"></p>
+  </section>
+
+  <!-- Results Modal -->
+  <section id="resultsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="resultsTitle">
+    <h3 id="resultsTitle">Gate Result</h3>
+    <p id="resultsText">Great job!</p>
+    <div class="actions">
+      <button id="resultsContinueBtn" class="primary">World Select</button>
+    </div>
+  </section>
+
+  <script defer src="game.js"></script>
+</body>
+</html>
