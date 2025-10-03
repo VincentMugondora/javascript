@@ -568,6 +568,16 @@
       const fallbacks = shuffleInPlace(DEFAULT_QUESTIONS.filter(q=>q.world===state.world && !list.find(x=>qid(x)===qid(q))));
       for(const q of fallbacks){ if(!list.find(x=>qid(x)===qid(q))) list.push(q); if(list.length>=3) break; }
     }
+    if(list.length < 3){ // absolute fallback: allow any default questions
+      const any = shuffleInPlace(DEFAULT_QUESTIONS.filter(q=>!list.find(x=>qid(x)===qid(q))));
+      for(const q of any){ if(!list.find(x=>qid(x)===qid(q))) list.push(q); if(list.length>=3) break; }
+    }
+    if(list.length < 3){ // last resort: reuse from pool to reach 3
+      while(list.length < 3){
+        const pick = pool[Math.floor(Math.random()*Math.max(1,pool.length))] || DEFAULT_QUESTIONS[0];
+        list.push(pick);
+      }
+    }
     redeem.list = list.slice(0,3);
     redeem.idx = 0; redeem.correct = 0; redeem.wrong = 0;
     show(redeemModal);
@@ -622,6 +632,7 @@
       // Early pass if 2 correct
       if(redeem.correct >= 2){ finishRedeemQuiz(true); return; }
     }else{
+      clearRedeemTimer();
       audio.sfx('wrong');
       redeem.wrong += 1;
       // Early fail if 2 wrong
