@@ -93,14 +93,14 @@
     loaded: false,
     // map SFX keys to asset urls (user should place files in javascript/assets/audio/)
     files: {
-      jump: 'assets/audio/jump.wav',
-      coin: 'assets/audio/coin.wav',
-      correct: 'assets/audio/correct.mp3',
-      wrong: 'assets/audio/wrong.wav',
-      gate: 'assets/audio/gate_open.mp3',
-      tick: 'assets/audio/tick.wav',
-      fail: 'assets/audio/fail.wav',
-      button: 'assets/audio/click.wav'
+      jump: 'assets/audio/jump.ogg',
+      coin: 'assets/audio/coin.ogg',
+      correct: 'assets/audio/correct.ogg',
+      wrong: 'assets/audio/wrong.ogg',
+      gate: 'assets/audio/gate_open.ogg',
+      tick: 'assets/audio/tick.ogg',
+      fail: 'assets/audio/fail.ogg',
+      button: 'assets/audio/click.ogg'
     },
     elems: {},
     init(){
