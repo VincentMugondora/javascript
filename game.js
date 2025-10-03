@@ -526,19 +526,15 @@
       scores[w] = Math.max(prev, state.score);
       save(KEYS.scores, scores);
       if(perfect){
-        // Immediately continue playing: start next level (or exit to worlds if last)
+        // Open the gate and resume the SAME level immediately
+        if(state.gate) state.gate.open = true;
         state.inQuiz = false; state.paused = false;
-        if(state.level < 3){
-          startGame(state.world, state.level + 1);
-        }else{
-          gotoWorldSelect();
-        }
+        startGame(state.world, state.level);
         return;
       }
       // Auto-advance: if next level exists, show brief results first for non-perfect pass
       resultsContinueBtn.classList.add('hidden');
       show(resultsModal);
-      setTimeout(()=>{
         hide(resultsModal);
         state.inQuiz = false; state.paused = false;
         if(state.level < 3){
