@@ -205,6 +205,7 @@
     stars: 0,
     inQuiz: false,
     inRedeem: false,
+    redeemCooldownUntil: 0,
     levelTimeLeft: 0,
     levelFinished: false,
     // gameplay
@@ -551,6 +552,7 @@
 
   function onHitObstacle(){
     if(state.inRedeem || state.inQuiz) return;
+    if(state.redeemCooldownUntil && Date.now() < state.redeemCooldownUntil) return;
     triggerRedeem();
   }
 
@@ -665,6 +667,8 @@
     if(passed){
       // resume play without penalty
       state.paused = false;
+      state.redeemCooldownUntil = Date.now() + 1200; // 1.2s grace to avoid instant retrigger
+      pushPlayerOffObstacles();
       return;
     }
     // fail: clear message and respawn to checkpoint/start
@@ -685,6 +689,22 @@
 
   // legacy fail (kept in case of other calls)
   function redeemFail(){ finishRedeemQuiz(false); }
+
+  // Ensure player is not overlapping any obstacle (nudge left/right)
+  function pushPlayerOffObstacles(){
+    const p = state.player; if(!p) return;
+    for(const o of state.obstacles){
+      if(aabb(p.x,p.y,p.w,p.h, o.x,o.y,o.w,o.h)){
+        const pCenter = p.x + p.w/2;
+        const oCenter = o.x + o.w/2;
+        if(pCenter < oCenter){
+          p.x = o.x - p.w - 2; // move to left side
+        }else{
+          p.x = o.x + o.w + 2; // move to right side
+        }
+      }
+    }
+  }
 
   function renderQuiz(){
     const q = quiz.list[quiz.idx];
