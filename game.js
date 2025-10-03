@@ -27,6 +27,7 @@
   const starsVal = document.getElementById('starsVal');
   const worldVal = document.getElementById('worldVal');
   const levelVal = document.getElementById('levelVal');
+  const levelTimerVal = document.getElementById('levelTimerVal');
   const pauseBtn = document.getElementById('pauseBtn');
 
   const canvas = document.getElementById('gameCanvas');
@@ -44,6 +45,7 @@
   const quizChoices = document.getElementById('quizChoices');
   const hintBtn = document.getElementById('hintBtn');
   const quizHint = document.getElementById('quizHint');
+  const quizTimerEl = document.getElementById('quizTimer');
 
   const resultsModal = document.getElementById('resultsModal');
   const resultsText = document.getElementById('resultsText');
@@ -92,6 +94,7 @@
     stars: 0,
     inQuiz: false,
     inRedeem: false,
+    levelTimeLeft: 0,
     // gameplay
     player: null,
     coins: [],
@@ -191,6 +194,8 @@
     state.world = world; state.level = level; state.score = 0; state.stars = 0; state.paused = false; state.inQuiz = false; state.inRedeem = false; state.checkpointX = 0;
     worldVal.textContent = prettyWorld(world);
     levelVal.textContent = String(level);
+    state.levelTimeLeft = levelTimeFor(level);
+    if(levelTimerVal) levelTimerVal.textContent = formatTime(state.levelTimeLeft);
     // Player
     state.player = { x: 40, y: GROUND_Y-50, w: 40, h: 50, vx:0, vy:0, onGround:true };
     state.respawn = { x: 40, y: GROUND_Y-50 };
@@ -316,6 +321,15 @@
     // HUD
     scoreVal.textContent = String(state.score);
     starsVal.textContent = String(state.stars);
+    // Level timer countdown
+    if(state.levelTimeLeft > 0){
+      state.levelTimeLeft = Math.max(0, state.levelTimeLeft - dt);
+      if(levelTimerVal) levelTimerVal.textContent = formatTime(state.levelTimeLeft);
+      if(state.levelTimeLeft <= 0){
+        onLevelTimeout();
+        return;
+      }
+    }
   }
 
   function render(){
@@ -358,6 +372,9 @@
 
   // Redeem quiz (single timed question)
   let redeem = { q:null, deadline:0, timerId:null };
+
+  // Quiz per-question countdown
+  let quizCountdown = { timerId:null, end:0 };
 
   function openQuiz(){
     if(state.inQuiz) return;
@@ -460,9 +477,13 @@
       btn.addEventListener('click', ()=> onAnswer(i));
       quizChoices.appendChild(btn);
     });
+    // Start per-question timer (harder on higher levels)
+    const seconds = state.level === 1 ? 15 : state.level === 2 ? 12 : 10;
+    startQuizTimer(seconds);
   }
 
   function onAnswer(index){
+    clearQuizTimer();
     const q = quiz.list[quiz.idx];
     if(index === q.answerIndex){
       // correct
@@ -485,6 +506,7 @@
   }
 
   function finishQuiz(){
+    clearQuizTimer(); if(quizTimerEl) quizTimerEl.textContent = '--';
     hide(quizModal);
     const pass = quiz.correct >= 2;
     const progress = load(KEYS.progress, {});
@@ -520,6 +542,15 @@
       resultsText.textContent = `You got ${quiz.correct}/3. Try again to pass the gate!`;
       resultsContinueBtn.classList.remove('hidden');
     }
+    show(resultsModal);
+  }
+
+  function onLevelTimeout(){
+    // Level failed due to time out
+    state.paused = true;
+    hide(quizModal); clearQuizTimer();
+    resultsText.textContent = `Time's up! Level failed.`;
+    resultsContinueBtn.classList.remove('hidden');
     show(resultsModal);
   }
 
@@ -566,6 +597,37 @@
   function shuffleInPlace(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
   function flashElement(el, color){
     const prev = el.style.color; el.style.color = color; setTimeout(()=>{ el.style.color = prev; }, 220);
+  }
+
+  // Quiz timers
+  function startQuizTimer(seconds){
+    clearQuizTimer();
+    const end = Date.now() + seconds*1000;
+    quizCountdown.end = end;
+    if(quizTimerEl) quizTimerEl.textContent = `${Math.ceil(seconds)}s`;
+    quizCountdown.timerId = setInterval(()=>{
+      const remaining = Math.max(0, end - Date.now());
+      const s = Math.ceil(remaining/1000);
+      if(quizTimerEl) quizTimerEl.textContent = `${s}s`;
+      if(remaining <= 0){
+        clearQuizTimer();
+        onQuizTimeExpired();
+      }
+    }, 100);
+  }
+  function clearQuizTimer(){ if(quizCountdown.timerId){ clearInterval(quizCountdown.timerId); quizCountdown.timerId = null; } }
+  function onQuizTimeExpired(){
+    // Count as incorrect and move to next question
+    flashElement(quizQuestion, '#ef4444');
+    nextQuizStep();
+  }
+
+  // Helpers for time formatting
+  function formatTime(seconds){
+    const s = Math.max(0, Math.floor(seconds));
+    const m = Math.floor(s/60);
+    const r = s%60;
+    return `${m}:${r.toString().padStart(2,'0')}`;
   }
 
   // Wire up top-level buttons
