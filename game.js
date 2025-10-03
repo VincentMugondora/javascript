@@ -51,6 +51,11 @@
   const resultsText = document.getElementById('resultsText');
   const resultsContinueBtn = document.getElementById('resultsContinueBtn');
 
+  // Level transition modal
+  const levelModal = document.getElementById('levelModal');
+  const levelModalTitle = document.getElementById('levelModalTitle');
+  const levelModalText = document.getElementById('levelModalText');
+
   // Redeem modal
   const redeemModal = document.getElementById('redeemModal');
   const redeemTimer = document.getElementById('redeemTimer');
@@ -299,12 +304,12 @@
   // Screens
   function gotoStart(){
     state.screen = 'start';
-    hide(worldSelectScreen); hide(levelSelectScreen); hide(canvas); hide(hud); hide(touchControls); hide(quizModal); hide(resultsModal); hide(redeemModal);
+    hide(worldSelectScreen); hide(levelSelectScreen); hide(canvas); hide(hud); hide(touchControls); hide(quizModal); hide(resultsModal); hide(redeemModal); hide(levelModal);
     show(startScreen);
   }
   function gotoWorldSelect(){
     state.screen = 'worldSelect';
-    hide(startScreen); hide(levelSelectScreen); hide(canvas); hide(hud); hide(touchControls); hide(quizModal); hide(resultsModal); hide(redeemModal);
+    hide(startScreen); hide(levelSelectScreen); hide(canvas); hide(hud); hide(touchControls); hide(quizModal); hide(resultsModal); hide(redeemModal); hide(levelModal);
     show(worldSelectScreen);
   }
 
@@ -342,7 +347,7 @@
   function startGame(world, level){
     initLevel(world, level);
     state.screen = 'play';
-    hide(startScreen); hide(worldSelectScreen); hide(levelSelectScreen); hide(resultsModal); hide(quizModal); hide(redeemModal);
+    hide(startScreen); hide(worldSelectScreen); hide(levelSelectScreen); hide(resultsModal); hide(quizModal); hide(redeemModal); hide(levelModal);
     show(canvas); show(hud); show(touchControls);
   }
 
@@ -700,14 +705,25 @@
   function onLevelFinish(){
     state.levelFinished = true;
     audio.sfx('correct');
-    // small delay for feel
-    setTimeout(()=>{
-      if(state.level < 3){
+    state.paused = true;
+    // Show transition text
+    if(state.level < 3){
+      if(levelModalTitle) levelModalTitle.textContent = `Level ${state.level + 1}`;
+      if(levelModalText) levelModalText.textContent = `${prettyWorld(state.world)} — Get ready!`;
+      show(levelModal);
+      setTimeout(()=>{
+        hide(levelModal);
         startGame(state.world, state.level + 1);
-      }else{
+      }, 1000);
+    }else{
+      if(levelModalTitle) levelModalTitle.textContent = `World Complete!`;
+      if(levelModalText) levelModalText.textContent = `${prettyWorld(state.world)} — Returning to World Select...`;
+      show(levelModal);
+      setTimeout(()=>{
+        hide(levelModal);
         gotoWorldSelect();
-      }
-    }, 300);
+      }, 1200);
+    }
   }
 
   // Level layout helper
