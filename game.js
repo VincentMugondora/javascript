@@ -197,6 +197,7 @@
     inQuiz: false,
     inRedeem: false,
     levelTimeLeft: 0,
+    levelFinished: false,
     // gameplay
     player: null,
     coins: [],
@@ -327,6 +328,7 @@
     levelVal.textContent = String(level);
     state.levelTimeLeft = levelTimeFor(level);
     if(levelTimerVal) levelTimerVal.textContent = formatTime(state.levelTimeLeft);
+    state.levelFinished = false;
     // Player
     state.player = { x: 40, y: GROUND_Y-50, w: 40, h: 50, vx:0, vy:0, onGround:true };
     state.respawn = { x: 40, y: GROUND_Y-50 };
@@ -447,6 +449,11 @@
     const g = state.gate;
     if(!g.open && p.x + p.w >= g.x){
       openQuiz();
+    }
+    // Finish line: if gate is open and player crosses beyond gate, advance
+    if(g.open && !state.levelFinished && p.x >= g.x + g.w){
+      onLevelFinish();
+      return;
     }
 
     // HUD
@@ -688,6 +695,19 @@
     resultsText.textContent = `Time's up! Level failed.`;
     resultsContinueBtn.classList.remove('hidden');
     show(resultsModal);
+  }
+
+  function onLevelFinish(){
+    state.levelFinished = true;
+    audio.sfx('correct');
+    // small delay for feel
+    setTimeout(()=>{
+      if(state.level < 3){
+        startGame(state.world, state.level + 1);
+      }else{
+        gotoWorldSelect();
+      }
+    }, 300);
   }
 
   // Level layout helper
