@@ -511,6 +511,7 @@
     const pass = quiz.correct >= 2;
     const progress = load(KEYS.progress, {});
     if(pass){
+      const perfect = quiz.correct === 3;
       resultsText.textContent = `Great! You answered ${quiz.correct}/3 correctly. Gate opens! +100 bonus`;
       state.score += 100; // end-of-stage bonus for passing
       // unlock next level for current world
@@ -524,7 +525,17 @@
       const prev = scores[w] || 0;
       scores[w] = Math.max(prev, state.score);
       save(KEYS.scores, scores);
-      // Auto-advance: if next level exists, start it shortly; else go to World Select
+      if(perfect){
+        // Immediately continue playing: start next level (or exit to worlds if last)
+        state.inQuiz = false; state.paused = false;
+        if(state.level < 3){
+          startGame(state.world, state.level + 1);
+        }else{
+          gotoWorldSelect();
+        }
+        return;
+      }
+      // Auto-advance: if next level exists, show brief results first for non-perfect pass
       resultsContinueBtn.classList.add('hidden');
       show(resultsModal);
       setTimeout(()=>{
